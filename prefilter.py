@@ -115,6 +115,48 @@ def score(segment):
     return value
 
 
+def build_gemini_prompt(candidates, source_url=""):
+    lines = [
+        "Anda adalah validator clip dari transcript podcast.",
+        "",
+        "Tugas:",
+        "1. Pilih kandidat yang paling layak menjadi short clip.",
+        "2. Validasi konteks berdasarkan timestamp yang diberikan.",
+        "3. Jangan mengarang timestamp.",
+        "4. Gunakan hanya rentang waktu yang tersedia.",
+        "5. Jika URL YouTube tersedia, gunakan URL tersebut.",
+        "6. Hasil akhir harus siap dipaste ke YTDLnis.",
+        "",
+        "FORMAT OUTPUT:",
+        "- Satu blok untuk setiap clip yang dipilih.",
+        "- Sertakan timestamp START dan END.",
+        "- Sertakan alasan singkat pemilihan.",
+        "- Jika URL tersedia, sertakan perintah yt-dlp/YTDLnis yang sesuai.",
+        "- Jangan memberikan penjelasan panjang di luar hasil.",
+        "",
+        "URL YOUTUBE:",
+        source_url.strip() if source_url else "(tidak tersedia)",
+        "",
+        "KANDIDAT PREFILTER:",
+    ]
+
+    if not candidates:
+        lines.append("(tidak ada kandidat)")
+    else:
+        for item in candidates:
+            lines.extend([
+                "",
+                f"Kandidat #{item['id']}",
+                f"Score: {item['score']}",
+                f"Anchor: {item['anchor_start']:.3f} - {item['anchor_end']:.3f}",
+                f"Context: {item['context_start']:.3f} - {item['context_end']:.3f}",
+                "Transcript:",
+                item["text"],
+            ])
+
+    return "\n".join(lines)
+
+
 def find_candidates(transcript, limit=20):
     segments = parse(transcript)
     candidates = []

@@ -1,30 +1,122 @@
 package com.clipper.core;
 
 import android.app.Activity;
+import android.content.ContentValues;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
 
 public class MainActivity extends Activity {
 
-    private void runPrefilter(String srt, TextView status) {
+    private void runPrefilter(
+            String transcript,
+            String sourceUrl,
+            TextView status
+    ) {
         status.setText("Menjalankan PREFILTER...");
 
         new Thread(() -> {
             try {
                 Python python = Python.getInstance();
                 PyObject module = python.getModule("prefilter");
-                PyObject candidates = module.callAttr("find_candidates", srt);
+
+                PyObject candidates =
+                        module.callAttr("find_candidates", transcript);
+
+                PyObject prompt =
+                        module.callAttr(
+                                "build_gemini_prompt",
+                                candidates,
+                                sourceUrl
+                        );
+
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    throw new IllegalStateException(
+                            "Output Download memerlukan Android 10+."
+                    );
+                }
+
+                String relativePath =
+                        Environment.DIRECTORY_DOWNLOADS + "/ClipperCore/";
+
+                getContentResolver().delete(
+                        MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                        MediaStore.MediaColumns.DISPLAY_NAME + "=? AND "
+                                + MediaStore.MediaColumns.RELATIVE_PATH + "=?",
+                        new String[]{"prompt.txt", relativePath}
+                );
+
+                ContentValues values = new ContentValues();
+                values.put(
+                        MediaStore.MediaColumns.DISPLAY_NAME,
+                        "prompt.txt"
+                );
+                values.put(
+                        MediaStore.MediaColumns.MIME_TYPE,
+                        "text/plain"
+                );
+                values.put(
+                        MediaStore.MediaColumns.RELATIVE_PATH,
+                        relativePath
+                );
+                values.put(
+                        MediaStore.MediaColumns.IS_PENDING,
+                        1
+                );
+
+                Uri outputUri = getContentResolver().insert(
+                        MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                        values
+                );
+
+                if (outputUri == null) {
+                    throw new IllegalStateException(
+                            "Gagal membuat prompt.txt di Download."
+                    );
+                }
+
+                try (OutputStream out =
+                             getContentResolver().openOutputStream(outputUri)) {
+                    if (out == null) {
+                        throw new IllegalStateException(
+                                "Gagal membuka prompt.txt."
+                        );
+                    }
+
+                    out.write(
+                            prompt.toJava(String.class)
+                                    .getBytes(StandardCharsets.UTF_8)
+                    );
+                }
+
+                ContentValues ready = new ContentValues();
+                ready.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                getContentResolver().update(
+                        outputUri,
+                        ready,
+                        null,
+                        null
+                );
+
                 int count = candidates.asList().size();
 
                 runOnUiThread(() ->
                         status.setText(
-                                "PREFILTER selesai: " + count + " kandidat."
+                                "PREFILTER selesai: " + count
+                                        + " kandidat.\n"
+                                        + "Prompt: Download/ClipperCore/prompt.txt"
                         )
                 );
             } catch (Exception e) {
@@ -70,7 +162,7 @@ public class MainActivity extends Activity {
             String value = url.getText().toString().trim();
 
             if (!srt.isEmpty()) {
-                runPrefilter(srt, status);
+                runPrefilter(srt, value, status);
                 return;
             }
 
@@ -90,7 +182,7 @@ public class MainActivity extends Activity {
 
                     runOnUiThread(() -> {
                         transcript.setText(result);
-                        runPrefilter(result, status);
+                        runPrefilter(result, value, status);
                     });
                 } catch (Exception e) {
                     runOnUiThread(() ->
