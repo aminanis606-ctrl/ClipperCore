@@ -7,6 +7,9 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.chaquo.python.PyObject;
+import com.chaquo.python.Python;
+
 public class MainActivity extends Activity {
 
     @Override
@@ -39,12 +42,41 @@ public class MainActivity extends Activity {
 
         button.setOnClickListener(v -> {
             String srt = transcript.getText().toString().trim();
+            String value = url.getText().toString().trim();
 
-            if (srt.isEmpty()) {
-                status.setText("Masukkan transcript SRT.");
-            } else {
+            if (!srt.isEmpty()) {
                 status.setText("Transcript SRT diterima. Siap masuk PREFILTER.");
+                return;
             }
+
+            if (value.isEmpty()) {
+                status.setText("Masukkan URL YouTube atau transcript SRT.");
+                return;
+            }
+
+            status.setText("Mengambil transcript YouTube...");
+
+            new Thread(() -> {
+                try {
+                    Python python = Python.getInstance();
+                    PyObject module = python.getModule("main");
+                    String result = module.callAttr("transcript_srt", value)
+                            .toJava(String.class);
+
+                    runOnUiThread(() -> {
+                        transcript.setText(result);
+                        status.setText(
+                                "Transcript berhasil diambil. Siap masuk PREFILTER."
+                        );
+                    });
+                } catch (Exception e) {
+                    runOnUiThread(() ->
+                            status.setText(
+                                    "Transcript gagal diambil: " + e.getMessage()
+                            )
+                    );
+                }
+            }).start();
         });
 
         layout.addView(title);
