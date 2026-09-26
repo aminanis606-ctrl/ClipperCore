@@ -12,13 +12,66 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
 
 public class MainActivity extends Activity {
+
+    private String transcriptCacheKey(String sourceUrl) throws Exception {
+        byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(sourceUrl.trim().getBytes(StandardCharsets.UTF_8));
+
+        StringBuilder hex = new StringBuilder();
+        for (byte value : digest) {
+            hex.append(String.format("%02x", value));
+        }
+
+        return "transcript-" + hex + ".srt";
+    }
+
+    private File transcriptCacheFile(String sourceUrl) throws Exception {
+        return new File(getCacheDir(), transcriptCacheKey(sourceUrl));
+    }
+
+    private String readTranscriptCache(String sourceUrl) throws Exception {
+        File cacheFile = transcriptCacheFile(sourceUrl);
+
+        if (!cacheFile.isFile()) {
+            return null;
+        }
+
+        try (FileInputStream in = new FileInputStream(cacheFile);
+             java.io.ByteArrayOutputStream buffer =
+                     new java.io.ByteArrayOutputStream()) {
+
+            byte[] data = new byte[8192];
+            int count;
+
+            while ((count = in.read(data)) != -1) {
+                buffer.write(data, 0, count);
+            }
+
+            return buffer.toString("UTF-8");
+        }
+    }
+
+    private void writeTranscriptCache(
+            String sourceUrl,
+            String transcript
+    ) throws Exception {
+        File cacheFile = transcriptCacheFile(sourceUrl);
+
+        try (FileOutputStream out = new FileOutputStream(cacheFile)) {
+            out.write(transcript.getBytes(StandardCharsets.UTF_8));
+        }
+    }
 
     private void runPrefilter(
             String transcript,
@@ -171,14 +224,33 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            status.setText("Mengambil transcript YouTube...");
-
             new Thread(() -> {
                 try {
+                    String cached = readTranscriptCache(value);
+
+                    if (cached != null && !cached.trim().isEmpty()) {
+                        runOnUiThread(() -> {
+                            transcript.setText(cached);
+                            status.setText(
+                                    "Transcript dari cache. Menjalankan PREFILTER..."
+                            );
+                            runPrefilter(cached, value, status);
+                        });
+                        return;
+                    }
+
+                    runOnUiThread(() ->
+                            status.setText("Mengambil transcript YouTube...")
+                    );
+
                     Python python = Python.getInstance();
                     PyObject module = python.getModule("main");
-                    String result = module.callAttr("transcript_srt", value)
-                            .toJava(String.class);
+
+                    String result =
+                            module.callAttr("transcript_srt", value)
+                                    .toJava(String.class);
+
+                    writeTranscriptCache(value, result);
 
                     runOnUiThread(() -> {
                         transcript.setText(result);
