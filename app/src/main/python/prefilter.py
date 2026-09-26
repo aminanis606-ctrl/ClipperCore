@@ -157,6 +157,35 @@ def build_gemini_prompt(candidates, source_url=""):
     return "\n".join(lines)
 
 
+def group_candidates(candidates):
+    """Group candidates into transitive overlapping context components."""
+    groups = []
+
+    for candidate in candidates:
+        overlapping = []
+
+        for index, group in enumerate(groups):
+            if any(
+                candidate["context_start"] < item["context_end"]
+                and candidate["context_end"] > item["context_start"]
+                for item in group
+            ):
+                overlapping.append(index)
+
+        if not overlapping:
+            groups.append([candidate])
+            continue
+
+        merged = [candidate]
+
+        for index in reversed(overlapping):
+            merged.extend(groups.pop(index))
+
+        groups.append(merged)
+
+    return groups
+
+
 def find_candidates(transcript, limit=20):
     segments = parse(transcript)
     candidates = []

@@ -38,7 +38,35 @@ def main():
 
     print("[3] VALIDATOR")
 
-    clips = validate(candidates)
+    from prefilter import group_candidates
+
+    groups = group_candidates(candidates)
+    clips = []
+
+    group_sizes = [len(group) for group in groups]
+
+    print(
+        f"[GROUPING] {len(groups)} group"
+    )
+
+    print(
+        f"[GROUPING] sizes={','.join(map(str, group_sizes))}"
+    )
+
+    if group_sizes:
+        print(
+            f"[GROUPING] max_group={max(group_sizes)}"
+        )
+    else:
+        print("[GROUPING] max_group=0")
+
+    for index, group in enumerate(groups, 1):
+        print(
+            f"[VALIDATOR] batch {index}/{len(groups)}: "
+            f"{len(group)} kandidat"
+        )
+
+        clips.extend(validate(group))
 
     print(
         f"[VALIDATOR] {len(clips)} clip final"
