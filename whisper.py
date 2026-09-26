@@ -1,6 +1,8 @@
 import subprocess
 import requests
 
+from youtube_transcript_api import YouTubeTranscriptApi
+
 from config import API_KEY, TEMP
 
 
@@ -23,6 +25,52 @@ def video_id(url):
     return result.stdout.strip()
 
 
+def transcript_from_youtube(vid):
+    output = TEMP / f"{vid}_transcript.txt"
+
+    try:
+        api = YouTubeTranscriptApi()
+
+        for languages in (["id", "en"], ["en", "id"]):
+            try:
+                fetched = api.fetch(
+                    vid,
+                    languages=languages
+                )
+
+                lines = []
+
+                for item in fetched:
+                    start = float(item.start)
+                    end = start + float(item.duration)
+                    text = item.text.strip()
+
+                    if text and end > start:
+                        lines.append(
+                            f"[{start:.1f} - {end:.1f}] {text}"
+                        )
+
+                if lines:
+                    output.write_text(
+                        "\n".join(lines),
+                        encoding="utf-8"
+                    )
+                    print(
+                        f"[TRANSCRIPT] YouTube transcript "
+                        f"ditemukan ({languages[0]})"
+                    )
+                    return output
+
+            except Exception:
+                continue
+
+    except Exception:
+        pass
+
+    print("[TRANSCRIPT] Tidak tersedia. Fallback ke Whisper.")
+    return None
+
+
 def transcript(url):
     vid = video_id(url)
 
@@ -37,6 +85,11 @@ def transcript(url):
     if output.exists() and output.stat().st_size > 100:
         print("[CACHE] Transcript ditemukan.")
         return output
+
+    transcript_file = transcript_from_youtube(vid)
+
+    if transcript_file:
+        return transcript_file
 
     print("[AUDIO] Download audio penuh...")
 
