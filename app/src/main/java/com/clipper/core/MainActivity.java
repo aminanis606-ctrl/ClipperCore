@@ -24,24 +24,32 @@ public class MainActivity extends Activity {
         EditText url = new EditText(this);
         url.setHint("YouTube Podcast URL");
 
+        EditText transcript = new EditText(this);
+        transcript.setHint("Tempel transcript SRT");
+        transcript.setGravity(android.view.Gravity.TOP);
+        transcript.setMinLines(8);
+        transcript.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+
         Button button = new Button(this);
-        button.setText("Cari Clip");
+        button.setText("Analisis Transcript");
 
         TextView status = new TextView(this);
         status.setText("Siap.");
 
         button.setOnClickListener(v -> {
-            String value = url.getText().toString().trim();
+            String srt = transcript.getText().toString().trim();
 
-            if (value.isEmpty()) {
-                status.setText("Masukkan URL YouTube.");
+            if (srt.isEmpty()) {
+                status.setText("Masukkan transcript SRT.");
             } else {
-                status.setText("URL diterima. Pipeline akan disambungkan.");
+                status.setText("Transcript SRT diterima. Siap masuk PREFILTER.");
             }
         });
 
         layout.addView(title);
         layout.addView(url);
+        layout.addView(transcript);
         layout.addView(button);
         layout.addView(status);
 
