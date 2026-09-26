@@ -6,6 +6,11 @@ SEGMENT_RE = re.compile(
     r"(\d+(?:\.\d+)?)\]\s*(.*)"
 )
 
+SRT_TIME_RE = re.compile(
+    r"^(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s+-->\s+"
+    r"(\d{2}):(\d{2}):(\d{2})[,.](\d{3})$"
+)
+
 SIGNALS = re.compile(
     r"\b("
     r"karena|ternyata|tetapi|tapi|namun|akhirnya|"
@@ -27,26 +32,65 @@ BAD = re.compile(
 )
 
 
+def parse_timestamp(value):
+    hours, minutes, seconds, millis = map(int, value)
+    return (
+        hours * 3600
+        + minutes * 60
+        + seconds
+        + millis / 1000.0
+    )
+
+
 def parse(transcript):
     segments = []
+    lines = transcript.splitlines()
+    index = 0
 
-    for line in transcript.splitlines():
-        m = SEGMENT_RE.match(line)
+    while index < len(lines):
+        line = lines[index].strip()
 
-        if not m:
+        legacy = SEGMENT_RE.match(line)
+        if legacy:
+            start = float(legacy.group(1))
+            end = float(legacy.group(2))
+            text = legacy.group(3).strip()
+
+            if end > start and text:
+                segments.append({
+                    "start": start,
+                    "end": end,
+                    "text": text,
+                    "raw": line,
+                })
+
+            index += 1
             continue
 
-        start = float(m.group(1))
-        end = float(m.group(2))
-        text = m.group(3).strip()
+        srt = SRT_TIME_RE.match(line)
+        if srt:
+            groups = srt.groups()
+            start = parse_timestamp(groups[:4])
+            end = parse_timestamp(groups[4:])
 
-        if end > start and text:
-            segments.append({
-                "start": start,
-                "end": end,
-                "text": text,
-                "raw": line,
-            })
+            index += 1
+            text_lines = []
+
+            while index < len(lines) and lines[index].strip():
+                text_lines.append(lines[index].strip())
+                index += 1
+
+            text = " ".join(text_lines).strip()
+
+            if end > start and text:
+                segments.append({
+                    "start": start,
+                    "end": end,
+                    "text": text,
+                    "raw": f"[{start:.3f} - {end:.3f}] {text}",
+                })
+
+        index += 1
 
     return segments
 

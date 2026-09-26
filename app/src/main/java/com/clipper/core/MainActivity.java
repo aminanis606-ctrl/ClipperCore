@@ -12,6 +12,31 @@ import com.chaquo.python.Python;
 
 public class MainActivity extends Activity {
 
+    private void runPrefilter(String srt, TextView status) {
+        status.setText("Menjalankan PREFILTER...");
+
+        new Thread(() -> {
+            try {
+                Python python = Python.getInstance();
+                PyObject module = python.getModule("prefilter");
+                PyObject candidates = module.callAttr("find_candidates", srt);
+                int count = candidates.asList().size();
+
+                runOnUiThread(() ->
+                        status.setText(
+                                "PREFILTER selesai: " + count + " kandidat."
+                        )
+                );
+            } catch (Exception e) {
+                runOnUiThread(() ->
+                        status.setText(
+                                "PREFILTER gagal: " + e.getMessage()
+                        )
+                );
+            }
+        }).start();
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -45,7 +70,7 @@ public class MainActivity extends Activity {
             String value = url.getText().toString().trim();
 
             if (!srt.isEmpty()) {
-                status.setText("Transcript SRT diterima. Siap masuk PREFILTER.");
+                runPrefilter(srt, status);
                 return;
             }
 
@@ -65,9 +90,7 @@ public class MainActivity extends Activity {
 
                     runOnUiThread(() -> {
                         transcript.setText(result);
-                        status.setText(
-                                "Transcript berhasil diambil. Siap masuk PREFILTER."
-                        );
+                        runPrefilter(result, status);
                     });
                 } catch (Exception e) {
                     runOnUiThread(() ->
