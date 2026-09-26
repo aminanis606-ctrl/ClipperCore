@@ -76,9 +76,13 @@ public class MainActivity extends Activity {
     private void runPrefilter(
             String transcript,
             String sourceUrl,
-            TextView status
+            TextView status,
+            Button button
     ) {
-        status.setText("Menjalankan PREFILTER...");
+        runOnUiThread(() -> {
+            button.setEnabled(false);
+            status.setText("PREFILTER: menganalisis transcript...");
+        });
 
         new Thread(() -> {
             try {
@@ -87,6 +91,10 @@ public class MainActivity extends Activity {
 
                 PyObject candidates =
                         module.callAttr("find_candidates", transcript);
+
+                runOnUiThread(() ->
+                        status.setText("PREFILTER: menyusun prompt Gemini...")
+                );
 
                 PyObject prompt =
                         module.callAttr(
@@ -165,19 +173,21 @@ public class MainActivity extends Activity {
 
                 int count = candidates.asList().size();
 
-                runOnUiThread(() ->
-                        status.setText(
-                                "PREFILTER selesai: " + count
-                                        + " kandidat.\n"
-                                        + "Prompt: Download/ClipperCore/prompt.txt"
-                        )
-                );
+                runOnUiThread(() -> {
+                    button.setEnabled(true);
+                    status.setText(
+                            "PREFILTER selesai: " + count
+                                    + " kandidat.\n"
+                                    + "Prompt: Download/ClipperCore/prompt.txt"
+                    );
+                });
             } catch (Exception e) {
-                runOnUiThread(() ->
-                        status.setText(
-                                "PREFILTER gagal: " + e.getMessage()
-                        )
-                );
+                runOnUiThread(() -> {
+                    button.setEnabled(true);
+                    status.setText(
+                            "PREFILTER gagal: " + e.getMessage()
+                    );
+                });
             }
         }).start();
     }
@@ -215,7 +225,7 @@ public class MainActivity extends Activity {
             String value = url.getText().toString().trim();
 
             if (!srt.isEmpty()) {
-                runPrefilter(srt, value, status);
+                runPrefilter(srt, value, status, button);
                 return;
             }
 
@@ -223,6 +233,8 @@ public class MainActivity extends Activity {
                 status.setText("Masukkan URL YouTube atau transcript SRT.");
                 return;
             }
+
+            button.setEnabled(false);
 
             new Thread(() -> {
                 try {
@@ -234,7 +246,7 @@ public class MainActivity extends Activity {
                             status.setText(
                                     "Transcript dari cache. Menjalankan PREFILTER..."
                             );
-                            runPrefilter(cached, value, status);
+                            runPrefilter(cached, value, status, button);
                         });
                         return;
                     }
@@ -254,14 +266,15 @@ public class MainActivity extends Activity {
 
                     runOnUiThread(() -> {
                         transcript.setText(result);
-                        runPrefilter(result, value, status);
+                        runPrefilter(result, value, status, button);
                     });
                 } catch (Exception e) {
-                    runOnUiThread(() ->
-                            status.setText(
-                                    "Transcript gagal diambil: " + e.getMessage()
-                            )
-                    );
+                    runOnUiThread(() -> {
+                        button.setEnabled(true);
+                        status.setText(
+                                "Transcript gagal diambil: " + e.getMessage()
+                        );
+                    });
                 }
             }).start();
         });
