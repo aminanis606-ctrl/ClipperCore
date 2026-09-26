@@ -112,8 +112,13 @@ public class MainActivity extends Activity {
                 String relativePath =
                         Environment.DIRECTORY_DOWNLOADS + "/ClipperCore/";
 
+                Uri downloadsUri =
+                        MediaStore.Downloads.getContentUri(
+                                MediaStore.VOLUME_EXTERNAL_PRIMARY
+                        );
+
                 getContentResolver().delete(
-                        MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                        downloadsUri,
                         MediaStore.MediaColumns.DISPLAY_NAME + "=? AND "
                                 + MediaStore.MediaColumns.RELATIVE_PATH + "=?",
                         new String[]{"prompt.txt", relativePath}
@@ -138,7 +143,7 @@ public class MainActivity extends Activity {
                 );
 
                 Uri outputUri = getContentResolver().insert(
-                        MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                        downloadsUri,
                         values
                 );
 
