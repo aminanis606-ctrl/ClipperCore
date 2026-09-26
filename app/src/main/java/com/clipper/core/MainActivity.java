@@ -242,7 +242,6 @@ public class MainActivity extends Activity {
 
                     if (cached != null && !cached.trim().isEmpty()) {
                         runOnUiThread(() -> {
-                            transcript.setText(cached);
                             status.setText(
                                     "Transcript dari cache. Menjalankan PREFILTER..."
                             );
@@ -264,10 +263,9 @@ public class MainActivity extends Activity {
 
                     writeTranscriptCache(value, result);
 
-                    runOnUiThread(() -> {
-                        transcript.setText(result);
-                        runPrefilter(result, value, status, button);
-                    });
+                    runOnUiThread(() ->
+                            runPrefilter(result, value, status, button)
+                    );
                 } catch (Exception e) {
                     runOnUiThread(() -> {
                         button.setEnabled(true);
