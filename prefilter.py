@@ -167,8 +167,19 @@ def find_candidates(transcript, limit=20):
         if value <= 0:
             continue
 
-        start = max(0.0, segment["start"] - 30.0)
-        end = segment["end"] + 40.0
+        anchor_start = segment["start"]
+        anchor_end = segment["end"]
+        anchor_duration = anchor_end - anchor_start
+
+        context_budget = max(
+            0.0,
+            70.0 - anchor_duration
+        )
+        before = context_budget / 2.0
+        after = context_budget - before
+
+        start = max(0.0, anchor_start - before)
+        end = anchor_end + after
 
         context = [
             s for s in segments
@@ -176,9 +187,8 @@ def find_candidates(transcript, limit=20):
         ]
 
         candidates.append({
-            "id": index + 1,
-            "anchor_start": segment["start"],
-            "anchor_end": segment["end"],
+            "anchor_start": anchor_start,
+            "anchor_end": anchor_end,
             "context_start": start,
             "context_end": end,
             "score": value,
@@ -192,4 +202,27 @@ def find_candidates(transcript, limit=20):
         reverse=True
     )
 
-    return candidates[:limit]
+    selected = []
+
+    for candidate in candidates:
+        overlaps = any(
+            candidate["anchor_start"] < item["anchor_end"]
+            and candidate["anchor_end"] > item["anchor_start"]
+            for item in selected
+        )
+
+        if not overlaps:
+            selected.append(candidate)
+
+        if len(selected) >= limit:
+            break
+
+    selected.sort(
+        key=lambda item: item["score"],
+        reverse=True
+    )
+
+    for index, candidate in enumerate(selected, 1):
+        candidate["id"] = index
+
+    return selected
